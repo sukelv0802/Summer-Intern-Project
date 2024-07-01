@@ -8,6 +8,7 @@ import serial
 import pandas as pd
 import re
 
+
 def export_to_excel():
     try:
         data = [tree.item(item, "values") for item in tree.get_children()]
@@ -32,7 +33,8 @@ def set_threshold():
 update_flag = False
 def start_update():
     global update_flag
-    if not update_flag:     # A condition to prevent starting update when it's already running, was breaking without this
+    # A condition to prevent starting update when it's already running, was breaking without this
+    if not update_flag: 
         update_flag = True
         update_text()
 
