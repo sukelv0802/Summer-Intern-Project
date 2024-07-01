@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
         # Tree widget
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Timestamp", "Potentiometer", "Temperature"])
-        self.tree.header().setSectionResizeMode(QHeaderView.Stretch)
+        self.tree.header().setSectionResizeMode(QHeaderView.Interactive)
         self.tree.setAlternatingRowColors(True)
         self.tree.setSortingEnabled(True)
         
