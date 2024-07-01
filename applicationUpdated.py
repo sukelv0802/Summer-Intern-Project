@@ -4,11 +4,11 @@ import serial
 import pandas as pd
 import openpyxl
 from openpyxl.styles import PatternFill
+from openpyxl.chart import LineChart, Reference
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QTreeWidget, QTreeWidgetItem, 
                              QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, 
-                             QLineEdit, QMessageBox, QHeaderView, QSplitter, QStyle,
-                             QStyleFactory, QComboBox, QFileDialog, QDateTimeEdit,
-                             QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QLineEdit)
+                             QLineEdit, QMessageBox, QHeaderView, QSplitter, QCheckBox,
+                             QStyleFactory, QComboBox, QFileDialog, QDateTimeEdit)
 from PyQt5.QtCore import QTimer, Qt, QSettings, QDateTime
 from PyQt5.QtGui import QFont, QColor
 
@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
         
         # Tree widget
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Timestamp", "Data"])
+        self.tree.setHeaderLabels(["Timestamp", "Potentiometer", "Temperature"])
         self.tree.header().setSectionResizeMode(QHeaderView.Stretch)
         self.tree.setAlternatingRowColors(True)
         self.tree.setSortingEnabled(True)
@@ -83,22 +83,6 @@ class MainWindow(QMainWindow):
         timestamp_layout.addWidget(self.start_time)
         timestamp_layout.addWidget(QLabel("To:"))
         timestamp_layout.addWidget(self.end_time)
-
-        # Value range filter
-        value_layout = QHBoxLayout()
-        self.min_value = QLineEdit()
-        self.max_value = QLineEdit()
-        value_layout.addWidget(QLabel("Min Value:"))
-        value_layout.addWidget(self.min_value)
-        value_layout.addWidget(QLabel("Max Value:"))
-        value_layout.addWidget(self.max_value)
-
-        # Apply filter button
-        apply_filter_button = QPushButton("Apply Filter")
-        apply_filter_button.clicked.connect(self.apply_filter)
-        filter_layout.addLayout(timestamp_layout)
-        filter_layout.addLayout(value_layout)
-        filter_layout.addWidget(apply_filter_button)
         
         # Button layout
         button_layout = QHBoxLayout()
@@ -117,16 +101,17 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(export_button)
         button_layout.addWidget(clear_button)
         
+        
+        self.filter_checkbox = QCheckBox("Show only above threshold")
+        self.filter_checkbox.stateChanged.connect(self.apply_filter)
+        options_layout.addWidget(self.filter_checkbox)
+        
         # Combine layouts
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.addWidget(self.tree)
         right_layout.addLayout(button_layout)
         right_layout.addLayout(filter_layout)
-        # Add a clear filters button in the __init__ method:
-        clear_filter_button = QPushButton("Clear Filters")
-        clear_filter_button.clicked.connect(self.clear_filters)
-        filter_layout.addWidget(clear_filter_button)
         
         # Add widgets to splitter
         splitter.addWidget(options_bar)
@@ -146,6 +131,8 @@ class MainWindow(QMainWindow):
         self.update_flag = False
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_text)
+        self.last_temp = None
+        self.last_pot = None
 
         self.change_theme(self.theme_combo.currentText())
 
@@ -167,6 +154,7 @@ class MainWindow(QMainWindow):
         try:
             self.threshold_value = int(self.threshold_entry.text())
             QMessageBox.information(self, "Success", f"Threshold set to {self.threshold_value}")
+            self.apply_filter()  # Reapply filter after changing threshold
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid integer value for the threshold.")
 
@@ -201,16 +189,26 @@ class MainWindow(QMainWindow):
                     value = data.decode('utf-8').strip()
                     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                     try:
-                        numeric_value = float(value.split(':')[-1].strip())
-                        item = QTreeWidgetItem([timestamp, value])
-                        item.setData(2, Qt.UserRole, numeric_value)
-                        if self.threshold_value is not None and numeric_value > self.threshold_value:
-                            item.setBackground(0, QColor(255, 255, 0, 100))
-                            item.setBackground(1, QColor(255, 255, 0, 100))
-                        self.tree.addTopLevelItem(item)
-                        self.tree.scrollToBottom()
+                        if "Temperature Value:" in value:
+                            self.last_temp = float(value.split(':')[-1].strip())
+                        elif "Potentiometer Value:" in value:
+                            self.last_pot = float(value.split(':')[-1].strip())
+                            
+                            item = QTreeWidgetItem([
+                                timestamp,
+                                f"{self.last_pot:.2f}",
+                                f"{self.last_temp:.2f}°C" if self.last_temp is not None else "N/A"
+                            ])
+                            
+                            if self.threshold_value is not None and self.last_pot > self.threshold_value:
+                                item.setBackground(1, QColor(255, 255, 0, 100))
+                            
+                            self.tree.addTopLevelItem(item)
+                            self.tree.scrollToBottom()
+                            self.apply_filter()  # Apply filter after adding new item
                     except ValueError:
-                        self.tree.addTopLevelItem(QTreeWidgetItem([timestamp, value]))
+                        self.tree.addTopLevelItem(QTreeWidgetItem([timestamp, value, ""]))
+                        self.apply_filter()  # Apply filter even for invalid data
             except serial.SerialException as e:
                 self.stop_update()
                 QMessageBox.critical(self, "Error", f"Serial communication error: {str(e)}")
@@ -224,7 +222,7 @@ class MainWindow(QMainWindow):
             data = []
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
-                data.append([item.text(0), item.text(1)])
+                data.append([item.text(0), item.text(1), item.text(2)])
 
             filename, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx)")
             if not filename: # If the file dialog is cancelled
@@ -233,20 +231,20 @@ class MainWindow(QMainWindow):
             workbook = openpyxl.Workbook()
             sheet = workbook.active
             sheet.title = "Serial Data"
-
             sheet['A1'] = "Timestamp"
-            sheet['B1'] = "Data"
+            sheet['B1'] = "Potentiometer"
+            sheet['C1'] = "Temperature"
 
             # Write data and apply conditional formatting
             yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-            for row, (timestamp, value) in enumerate(data, start=2):
+            for row, (timestamp, pot_value, temp_value) in enumerate(data, start=2):
                 sheet.cell(row=row, column=1, value=timestamp)
-                sheet.cell(row=row, column=2, value=value)
+                sheet.cell(row=row, column=2, value=pot_value)
+                sheet.cell(row=row, column=3, value=temp_value)
                 
                 try:
-                    numeric_value = int(value.split(':')[-1].strip())
+                    numeric_value = float(pot_value)
                     if self.threshold_value is not None and numeric_value > self.threshold_value:
-                        sheet.cell(row=row, column=1).fill = yellow_fill
                         sheet.cell(row=row, column=2).fill = yellow_fill
                 except ValueError:
                     pass 
@@ -271,44 +269,19 @@ class MainWindow(QMainWindow):
             
     def clear_data(self):
         self.tree.clear()
+        self.filter_checkbox.setChecked(False)
         
     def apply_filter(self):
-        start_time = self.start_time.dateTime().toString("yyyy-MM-dd HH:mm:ss")
-        end_time = self.end_time.dateTime().toString("yyyy-MM-dd HH:mm:ss")
-    
-        try:
-            min_value = float(self.min_value.text()) if self.min_value.text() else float('-inf')
-            max_value = float(self.max_value.text()) if self.max_value.text() else float('inf')
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric values for min and max.")
-            return
-
         for i in range(self.tree.topLevelItemCount()):
             item = self.tree.topLevelItem(i)
-            timestamp = item.text(0)
-            value_str = item.text(1).split(':')[-1].strip()
-            
-            try:
-                value = float(value_str)
-            except ValueError:
-                # If value can't be converted to float, hide the item
-                item.setHidden(True)
-                continue
-
-            # Check if item is within the specified ranges
-            if start_time <= timestamp <= end_time and min_value <= value <= max_value:
-                item.setHidden(False)
+            if self.filter_checkbox.isChecked():
+                try:
+                    pot_value = float(item.text(1))
+                    item.setHidden(not (self.threshold_value is not None and pot_value > self.threshold_value))
+                except ValueError:
+                    item.setHidden(True)
             else:
-                item.setHidden(True)
-
-    # Add a method to clear filters
-    def clear_filters(self):
-        for i in range(self.tree.topLevelItemCount()):
-            self.tree.topLevelItem(i).setHidden(False)
-        self.start_time.setDateTime(QDateTime.currentDateTime().addDays(-1))
-        self.end_time.setDateTime(QDateTime.currentDateTime())
-        self.min_value.clear()
-        self.max_value.clear()
+                item.setHidden(False)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
