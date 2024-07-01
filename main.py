@@ -9,6 +9,7 @@ uart.init(115200, bits=8, parity=None, stop=1, tx=Pin(0), rx=Pin(1))
 uos.dupterm(uart)
 
 sensor_temp = machine.ADC(4)
+pot = ADC(Pin(26))
 
 def adc_to_temp(adc_value):
     voltage = (adc_value / 65535) * 3.3
@@ -18,4 +19,7 @@ while True:
     adc_value = sensor_temp.read_u16()
     temp = adc_to_temp(adc_value)
     print('Temperature Value: ', temp)
+
+    pot_value = pot.read_u16()
+    print('Potentiometer Value: ', pot_value)
     time.sleep(1)
