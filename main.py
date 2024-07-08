@@ -1,47 +1,52 @@
-from machine import I2C, Pin, ADC
+import machine
+from machine import Pin, I2C
 import time
+import uos
 
-# I2C setup
-i2c = I2C(1, scl=Pin(3), sda=Pin(2))
+# UART setup (unchanged)
+uart = machine.UART(0, baudrate=115200)
+uart.init(115200, bits=8, parity=None, stop=1, tx=Pin(0), rx=Pin(1))
+uos.dupterm(uart)
+
+i2c = I2C(0, scl=Pin(17), sda=Pin(16))
 
 # MCP23017 Constants
 MCP23017_ADDR = 0x20
 IODIRA = 0x00
+IODIRB = 0x01
 GPIOA = 0x12
+GPIOB = 0x13
 
-# ADC setup
-adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
+led = Pin(19, Pin.OUT)
 
-# Configure GPIOA pins as outputs
 def setup_mcp23017():
     i2c.writeto_mem(MCP23017_ADDR, IODIRA, b'\x00')
+    i2c.writeto_mem(MCP23017_ADDR, IODIRB, b'\x00')
+    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03')
 
-# Select the multiplexer channel
-def select_channel(channel):
+def set_mux_channel(channel):
     if 0 <= channel <= 31:
-        i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([channel]))
+        address = channel & 0x1F
+        i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x02')
+        i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([address]))
+        i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03') # latch the address by setting the WR to high
     else:
         print("Invalid Channel")
 
-def read_adc():
-    return adc.read_u16()
+def light_led(channel, duration=0.5):
+    set_mux_channel(channel)
+    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x01') # Set EN low to enable the selected channel
+    led.value(1)
+    print(f"Lit LED on channel: {channel+1}")
+    time.sleep(duration)
+    led.value(0)
+    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03') # Set EN high to disable all channels
 
-def find_potentiometer():
-    potentiometers = []
-    for channel in range(32):
-        select_channel(channel)
-        time.sleep(0.5)  # Allow the multiplexer to settle and ADC to stabilize
-        adc_value = read_adc()
-        print(f"Channel {channel}: ADC Value = {adc_value}")
-        if adc_value > threshold:  # Define a suitable threshold based on your setup
-            potentiometers.append(channel)
-    return potentiometers
 
-# Main execution
+# Main Program
 setup_mcp23017()
-threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
-pot_channel = find_potentiometer()
-if pot_channel:
-    print(f"Potentiometer found on channel {', '.join(map(str, pot_channel))}")
-else:
-    print("Potentiometer not found on any channel")
+led.value(0)
+while True:
+    for channel in range(32):
+        light_led(channel)
+        time.sleep(0.5)
