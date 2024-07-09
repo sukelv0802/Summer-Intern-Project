@@ -21,8 +21,8 @@ GPIOB = 0x13
 adc = ADC(Pin(26))  
 sensor_temp = machine.ADC(4)
 
-########## CONFIGURATION: CAN CHANGE DEPENDING ON WHAT MUX/PINS ARE BEING USED ################## 
-NUM_MUXES = 2  
+##########CONFIGURATION: CAN CHANGE DEPENDING ON WHAT MUX IS BEING USED################## 
+NUM_MUXES = 1  
 CHANNELS_PER_MUX = 32
 
 # GPIO pins for CS pins (Starts from Pin 2)
@@ -60,11 +60,9 @@ def read_voltage(mux, channel):
     adc_value = adc.read_u16()
     voltage = (adc_value / 65535) * 3.3
     print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
+    time.sleep(0.01)
     EN_PIN.value(1)
-    if voltage >= 1:
-        time.sleep(5)
-    else:
-        time.sleep(1)
+    # time.sleep(1)
     return voltage
 
 def adc_to_temp(adc_value):
@@ -75,9 +73,12 @@ def adc_to_temp(adc_value):
 setup_mcp23017()
 
 while True:
+    cycles = 1
     temp_adc_value = sensor_temp.read_u16()
     temp = adc_to_temp(temp_adc_value)
-    print(f'Temperature: {temp:.2f}C')
+    print(f'Cycles Number: {cycles}')
+    cycles += 1
+    print(f'Temperature: {temp:.2f}°C')
     
     for mux in range(NUM_MUXES):
         for channel in range(CHANNELS_PER_MUX):
@@ -85,4 +86,4 @@ while True:
             # print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
     
     print("------------------------")
-    time.sleep(1)
+    time.sleep(60)
