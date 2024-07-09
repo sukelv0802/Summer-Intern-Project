@@ -21,29 +21,47 @@ GPIOB = 0x13
 adc = ADC(Pin(26))  
 sensor_temp = machine.ADC(4)
 
+########## CONFIGURATION: CAN CHANGE DEPENDING ON WHAT MUX/PINS ARE BEING USED ################## 
+NUM_MUXES = 2  
+CHANNELS_PER_MUX = 32
+
+# GPIO pins for CS pins (Starts from Pin 2)
+CS_PINS = [Pin(i, Pin.OUT) for i in range(2, 2 + NUM_MUXES)] 
+
+# GPIO pins for WR and EN
+WR_PIN = Pin(20, Pin.OUT)
+EN_PIN = Pin(21, Pin.OUT)
+############################
+
 def setup_mcp23017():
     i2c.writeto_mem(MCP23017_ADDR, IODIRA, b'\x00')
-    i2c.writeto_mem(MCP23017_ADDR, IODIRB, b'\x00')
-    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03')
+    for cs_pin in CS_PINS:
+        cs_pin.value(1)
+    WR_PIN.value(1)
+    EN_PIN.value(1)
 
-def set_mux_channel(channel):
-    if 0 <= channel <= 31:
+def set_mux_channel(mux, channel):
+    if 0 <= mux < NUM_MUXES and 0 <= channel < CHANNELS_PER_MUX:
+        for cs_pin in CS_PINS:
+            cs_pin.value(1)
+
         address = channel & 0x1F
-        i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x02')
+        WR_PIN.value(0)
         i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([address]))
-        i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03') # Set WR high to latch the address
+        CS_PINS[mux].value(0)
+        WR_PIN.value(1) # Set WR high to latch the address
+        CS_PINS[mux].value(1)
     else:
-        print("Invalid Channel")
+        print("Invalid Mux or Channel")
 
-def read_voltage(channel):
-    set_mux_channel(channel)
-    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x01')
-    # time.sleep(1)
+def read_voltage(mux, channel):
+    set_mux_channel(mux, channel)
+    EN_PIN.value(0)
     adc_value = adc.read_u16()
     voltage = (adc_value / 65535) * 3.3
-    i2c.writeto_mem(MCP23017_ADDR, GPIOB, b'\x03')
-    print(f"Channel {channel+1} Voltage: {voltage:.3f} V")
-    if voltage >= 1.5:
+    print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
+    EN_PIN.value(1)
+    if voltage >= 1:
         time.sleep(5)
     else:
         time.sleep(1)
@@ -59,11 +77,12 @@ setup_mcp23017()
 while True:
     temp_adc_value = sensor_temp.read_u16()
     temp = adc_to_temp(temp_adc_value)
-    print(f'Temperature: {temp}°C')
+    print(f'Temperature: {temp:.2f}C')
     
-    for channel in range(32):
-        voltage = read_voltage(channel)
-        # print(f"Channel {channel+1} Voltage: {voltage:.3f} V")
+    for mux in range(NUM_MUXES):
+        for channel in range(CHANNELS_PER_MUX):
+            voltage = read_voltage(mux, channel)
+            # print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
     
     print("------------------------")
     time.sleep(1)
