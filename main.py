@@ -72,8 +72,8 @@ def adc_to_temp(adc_value):
 # Main Program
 setup_mcp23017()
 
+cycles = 1
 while True:
-    cycles = 1
     temp_adc_value = sensor_temp.read_u16()
     temp = adc_to_temp(temp_adc_value)
     print(f'Cycles Number: {cycles}')
