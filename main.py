@@ -1,5 +1,5 @@
 import machine
-from machine import Pin, ADC, I2C
+from machine import Pin, ADC, I2C, freq
 import time
 import uos
 
@@ -60,9 +60,8 @@ def read_voltage(mux, channel):
     adc_value = adc.read_u16()
     voltage = (adc_value / 65535) * 3.3
     print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
-    time.sleep(0.01)
+    time.sleep(0.05)
     EN_PIN.value(1)
-    # time.sleep(1)
     return voltage
 
 def adc_to_temp(adc_value):
@@ -78,12 +77,12 @@ while True:
     temp = adc_to_temp(temp_adc_value)
     print(f'Cycles Number: {cycles}')
     cycles += 1
-    print(f'Temperature: {temp:.2f}°C')
+    print(f'Temperature: {temp:.2f}°C') 
     
     for mux in range(NUM_MUXES):
         for channel in range(CHANNELS_PER_MUX):
             voltage = read_voltage(mux, channel)
-            # print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
     
     print("------------------------")
+    machine.idle()
     time.sleep(60)
