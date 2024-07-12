@@ -1,88 +1,110 @@
 import machine
-from machine import Pin, ADC, I2C, freq
+from machine import I2C, Pin, ADC
 import time
 import uos
 
-# UART setup
+# need this UART to send data to local computer
 uart = machine.UART(0, baudrate=115200)
 uart.init(115200, bits=8, parity=None, stop=1, tx=Pin(0), rx=Pin(1))
 uos.dupterm(uart)
 
-i2c = I2C(0, scl=Pin(17), sda=Pin(16))
+# I2C setup
+i2c = I2C(1, scl=Pin(3), sda=Pin(2))
 
 # MCP23017 Constants
 MCP23017_ADDR = 0x20
 IODIRA = 0x00
 GPIOA = 0x12
-IODIRB = 0x01
-GPIOB = 0x13
 
-# ADC setup for reading voltage and temperature
-adc = ADC(Pin(26))  
-sensor_temp = machine.ADC(4)
+# Mux constants
+mux_num = 8
 
-##########CONFIGURATION: CAN CHANGE DEPENDING ON WHAT MUX IS BEING USED################## 
-NUM_MUXES = 1  
-CHANNELS_PER_MUX = 32
+# ADC setup
+adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
 
-# GPIO pins for CS pins (Starts from Pin 2)
-CS_PINS = [Pin(i, Pin.OUT) for i in range(2, 2 + NUM_MUXES)] 
+mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)]
+wr_pin = Pin(20, Pin.OUT)
+temp_pin = machine.ADC(4)
 
-# GPIO pins for WR and EN
-WR_PIN = Pin(20, Pin.OUT)
-EN_PIN = Pin(21, Pin.OUT)
-############################
-
+# Configure GPIOA pins as outputs
 def setup_mcp23017():
     i2c.writeto_mem(MCP23017_ADDR, IODIRA, b'\x00')
-    for cs_pin in CS_PINS:
-        cs_pin.value(1)
-    WR_PIN.value(1)
-    EN_PIN.value(1)
 
-def set_mux_channel(mux, channel):
-    if 0 <= mux < NUM_MUXES and 0 <= channel < CHANNELS_PER_MUX:
-        for cs_pin in CS_PINS:
-            cs_pin.value(1)
+# Enable mux
+def enable_mux(mux_index):
+    for i, pin in enumerate(mux_en_pins):
+        pin.value(1 if i != mux_index else 0)
 
-        address = channel & 0x1F
-        WR_PIN.value(0)
-        i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([address]))
-        CS_PINS[mux].value(0)
-        WR_PIN.value(1) # Set WR high to latch the address
-        CS_PINS[mux].value(1)
+# Disable mux
+def disable_all_muxes():
+    for pin in mux_en_pins:
+        pin.value(1)
+
+# Reset mux
+def reset_mux():
+    i2c.writeto_mem(MCP23017_ADDR, GPIOA, b'\x00')
+
+# Select the multiplexer channel
+def select_channel(channel):
+    if 0 <= channel <= 31:
+        wr_pin(0)
+        i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([channel]))
+        wr_pin(1)
     else:
-        print("Invalid Mux or Channel")
+        print("Invalid Channel")
 
-def read_voltage(mux, channel):
-    set_mux_channel(mux, channel)
-    EN_PIN.value(0)
-    adc_value = adc.read_u16()
-    voltage = (adc_value / 65535) * 3.3
-    print(f"Mux {mux+1}, Channel {channel+1} Voltage: {voltage:.3f} V")
-    time.sleep(0.05)
-    EN_PIN.value(1)
-    return voltage
+def read_adc():
+    return adc.read_u16()
 
+# Read the temperature
 def adc_to_temp(adc_value):
     voltage = (adc_value / 65535) * 3.3
     return 27 - (voltage - 0.706) / 0.001721
 
-# Main Program
-setup_mcp23017()
+def find_potentiometer():
+    potentiometers = []
+    for mux_index in range(len(mux_en_pins)):
+        for channel in range(32):
+            check_for_pause()
+            temp_adc_value = temp_pin.read_u16()
+            temp = adc_to_temp(temp_adc_value)
+            select_channel(channel)
+            enable_mux(mux_index)
+            time.sleep(0.5)  # Allow the multiplexer to settle and ADC to stabilize
+            adc_value = read_adc()
+            voltage = (adc_value / 65535) * 3.3
+            data = f"Mux: {mux_index + 1}  Channel: {channel + 1}  Temperature: {temp:.5f}  Voltage: {voltage:.4f}"
+            print(data)
+            uart.write(data.encode())
+            if adc_value > threshold:  # Define a suitable threshold based on your setup          
+                potentiometers.append((mux_index + 1, channel + 1))
+            disable_all_muxes()
+    return potentiometers
 
-cycles = 1
+def check_for_pause():
+    if uart.any():
+        command = uart.read().decode('utf-8').strip()
+        if command == 'PAUSE':
+            print("Pausing...")
+            uart.write(b'Pause confirmed\n')
+            while True:
+                if uart.any():
+                    command = uart.read().decode('utf-8').strip()
+                    if command == 'RESUME':
+                        print("Resuming...")
+                        uart.write('Resume confirmed\n')
+                        break
+
+# Main execution
+setup_mcp23017()
+reset_mux()
+threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
 while True:
-    temp_adc_value = sensor_temp.read_u16()
-    temp = adc_to_temp(temp_adc_value)
-    print(f'Cycles Number: {cycles}')
-    cycles += 1
-    print(f'Temperature: {temp:.2f}°C') 
-    
-    for mux in range(NUM_MUXES):
-        for channel in range(CHANNELS_PER_MUX):
-            voltage = read_voltage(mux, channel)
-    
-    print("------------------------")
-    machine.idle()
-    time.sleep(60)
+    check_for_pause()
+    pot_channels = find_potentiometer()
+    # if pot_channels:
+    #     for mux, channel in pot_channels:
+    #         print(f"Potentiometer found on Mux {mux}, Channel {channel}")
+    # else:
+    #     print("Potentiometer not found on any channel")
+    time.sleep(1)
