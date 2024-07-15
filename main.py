@@ -22,9 +22,9 @@ mux_num = 8
 # ADC setup
 adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
 
-mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)]
-wr_pin = Pin(20, Pin.OUT)
-en_pin = Pin(21, Pin.OUT)
+mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # These are connected to each CS pin on muxes
+wr_pin = Pin(20, Pin.OUT) # This is connected to the WR pins
+en_pin = Pin(21, Pin.OUT) # This is connected to the EN pins
 temp_pin = machine.ADC(4)
 
 # Configure GPIOA pins as outputs

@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
                 self.serialConnection = serial.Serial(com_port, self.baudrate)
                 self.serialConnection.write(b'RESUME\n')
                 self.update_flag = True
-                self.timer.start(500) # CHANGE IF NEEDS TO BE FASTER/SLOWER
+                self.timer.start(100) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
                 self.start_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message
