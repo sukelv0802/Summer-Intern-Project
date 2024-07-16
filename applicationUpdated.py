@@ -166,14 +166,6 @@ class MainWindow(QMainWindow):
                 print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
                 self.serialConnection.flush()
                 self.serialConnection.write("RESUME\r".encode())
-                print("Resume command sent")
-                try:
-                    # Wait for a response with a timeout
-                    self.serialConnection.timeout = 2  # Set a timeout for reading (e.g., 2 seconds)
-                    response = self.serialConnection.read_until().strip()
-                    print(f"Response received: '{response.decode()}")
-                except Exception as e:
-                    print(f"Error receiving confirmation: {e}")
                 self.update_flag = True
                 self.timer.start(100) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
                 self.start_button.setEnabled(False)
@@ -196,10 +188,6 @@ class MainWindow(QMainWindow):
                 self.serialConnection.timeout = 2  # Set a timeout for reading (e.g., 2 seconds)
                 response = self.serialConnection.read_until().strip()
                 print(f"Response received: '{response.decode()}")
-                # if response == "PAUSE_CONFIRMED":
-                #     print("Confirmation received: PAUSE_CONFIRMED")
-                # else:
-                #     print("No or incorrect confirmation received.")
             except Exception as e:
                 print(f"Error receiving confirmation: {e}")
             self.serialConnection.close()
