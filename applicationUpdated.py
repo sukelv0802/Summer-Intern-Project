@@ -163,12 +163,22 @@ class MainWindow(QMainWindow):
             try:
                 com_port = self.com_combo.currentText()
                 self.serialConnection = serial.Serial(com_port, self.baudrate)
-                self.serialConnection.write(b'RESUME\n')
+                print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
+                self.serialConnection.flush()
+                self.serialConnection.write("RESUME\r".encode())
+                print("Resume command sent")
+                try:
+                    # Wait for a response with a timeout
+                    self.serialConnection.timeout = 2  # Set a timeout for reading (e.g., 2 seconds)
+                    response = self.serialConnection.read_until().strip()
+                    print(f"Response received: '{response.decode()}")
+                except Exception as e:
+                    print(f"Error receiving confirmation: {e}")
                 self.update_flag = True
                 self.timer.start(100) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
                 self.start_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
-                print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message
+                self.serialConnection.reset_input_buffer()
             except serial.SerialException as e:
                 QMessageBox.critical(self, "Error", f"Failed to open {com_port}: {str(e)}")
                 print(f"Failed to open {com_port}: {str:e}") # Debug message
@@ -178,17 +188,18 @@ class MainWindow(QMainWindow):
         self.timer.stop()
         if self.serialConnection:
             # Send PAUSE command
-            self.serialConnection.write(b'PAUSE\n')
+            self.serialConnection.flush()
+            self.serialConnection.write("PAUSE\r".encode())
             print("Pause command sent")
             try:
                 # Wait for a response with a timeout
                 self.serialConnection.timeout = 2  # Set a timeout for reading (e.g., 2 seconds)
-                response = self.serialConnection.readline().decode().strip()
-                print(f"Response received: '{response}")
-                if response == "PAUSE_CONFIRMED":
-                    print("Confirmation received: PAUSE_CONFIRMED")
-                else:
-                    print("No or incorrect confirmation received.")
+                response = self.serialConnection.read_until().strip()
+                print(f"Response received: '{response.decode()}")
+                # if response == "PAUSE_CONFIRMED":
+                #     print("Confirmation received: PAUSE_CONFIRMED")
+                # else:
+                #     print("No or incorrect confirmation received.")
             except Exception as e:
                 print(f"Error receiving confirmation: {e}")
             self.serialConnection.close()

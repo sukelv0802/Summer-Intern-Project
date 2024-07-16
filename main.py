@@ -2,11 +2,17 @@ import machine
 from machine import I2C, Pin, ADC
 import time
 import uos
+import select
+import sys
 
 # need this UART to send data to local computer
 uart = machine.UART(0, baudrate=115200)
 uart.init(115200, bits=8, parity=None, stop=1, tx=Pin(0), rx=Pin(1))
 uos.dupterm(uart)
+
+# Set up the poll object
+poll_obj = select.poll()
+poll_obj.register(sys.stdin, select.POLLIN)
 
 # I2C setup
 i2c = I2C(1, scl=Pin(3), sda=Pin(2))
@@ -66,6 +72,7 @@ def find_potentiometer():
     potentiometers = []
     for mux_index in range(len(mux_en_pins)):
         for channel in range(32):
+            check_for_pause()
             temp_adc_value = temp_pin.read_u16()
             temp = adc_to_temp(temp_adc_value)
             select_channel(channel)
@@ -74,14 +81,44 @@ def find_potentiometer():
             adc_value = read_adc()
             voltage = (adc_value / 65535) * 3.3
             data = f"Mux: {mux_index + 1}  Channel: {channel + 1}  Temperature: {temp:.5f}  Voltage: {voltage:.4f}"
-            print(data)
+            # print(data)
             time.sleep(0.1)  # Allow the multiplexer to settle and ADC to stabilize
-            uart.write(data.encode())
+            sys.stdout.write(data.encode() + b'\r\n')
             if adc_value > threshold:  # Define a suitable threshold based on your setup          
                 potentiometers.append((mux_index + 1, channel + 1))
             disable_all_muxes()
             en_pin.value(1)
     return potentiometers
+
+
+def check_for_pause():
+    pull_results = poll_obj.poll(1) # '1' is how long it will wait for message before looping again (in milliseconds)
+    if pull_results:
+        PC_command = sys.stdin.readline().strip()
+        if PC_command == 'PAUSE':
+            sys.stdout.write("Pause confirmed\r")
+            while True:
+                PC_command = sys.stdin.readline().strip()
+                if PC_command == 'RESUME':
+                    sys.stdout.write("Resume confirmed\r")
+                    break
+                else:
+                    continue
+
+# def check_for_pause():
+#     if uart.any():
+#         command = uart.read().decode('utf-8').strip()
+#         if command == 'PAUSE':
+#             print("Pausing...")
+#             uart.write(b'Pause confirmed\n')
+#             while True:
+#                 if uart.any():
+#                     command = uart.read().decode('utf-8').strip()
+#                     if command == 'RESUME':
+#                         print("Resuming...")
+#                         uart.write('Resume confirmed\n')
+#                         break
+
 
 # Main execution
 setup_mcp23017()
