@@ -100,7 +100,7 @@ def check_for_pause():
             while True:
                 PC_command = sys.stdin.readline().strip()
                 if PC_command == 'RESUME':
-                    sys.stdout.write("Resume confirmed\r")
+                    # sys.stdout.write("Resume confirmed\r")
                     break
                 else:
                     continue

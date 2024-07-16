@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
                 self.serialConnection.flush()
                 self.serialConnection.write("RESUME\r".encode())
                 self.update_flag = True
-                self.timer.start(100) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
+                self.timer.start(50) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
                 self.start_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self.serialConnection.reset_input_buffer()
@@ -185,9 +185,14 @@ class MainWindow(QMainWindow):
             print("Pause command sent")
             try:
                 # Wait for a response with a timeout
-                self.serialConnection.timeout = 2  # Set a timeout for reading (e.g., 2 seconds)
-                response = self.serialConnection.read_until().strip()
-                print(f"Response received: '{response.decode()}")
+                self.serialConnection.timeout = 0.1  # Set a timeout for reading (e.g., 2 seconds)
+                response = ''
+                while True:
+                    response = self.serialConnection.readline().strip()
+                    print(f"Response received: '{response.decode()}")    
+                    if 'Pause confirmed' in response.decode():
+                        print(f"Response received: '{response.decode()}")
+                        break
             except Exception as e:
                 print(f"Error receiving confirmation: {e}")
             self.serialConnection.close()
