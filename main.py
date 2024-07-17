@@ -104,20 +104,23 @@ def check_for_pause():
                     break
                 else:
                     continue
-
-# def check_for_pause():
-#     if uart.any():
-#         command = uart.read().decode('utf-8').strip()
-#         if command == 'PAUSE':
-#             print("Pausing...")
-#             uart.write(b'Pause confirmed\n')
-#             while True:
-#                 if uart.any():
-#                     command = uart.read().decode('utf-8').strip()
-#                     if command == 'RESUME':
-#                         print("Resuming...")
-#                         uart.write('Resume confirmed\n')
-#                         break
+        
+def check_for_reset():
+    pull_results = poll_obj.poll(1)
+    if pull_results:
+        PC_command = sys.stdin.readline().strip()
+        if PC_command == 'RESET':
+            reset_mux()
+            enable_mux(0)
+            select_channel(0)
+            sys.stdout.write("Reset to Mux1, Channel1\r")
+            while True:
+                PC_command = sys.stdin.readline().strip()
+                if PC_command == 'RESUME':
+                    # sys.stdout.write("Resume confirmed\r")
+                    break
+                else:
+                    continue
 
 
 # Main execution
@@ -125,6 +128,7 @@ setup_mcp23017()
 reset_mux()
 threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
 while True:
+    # check_for_reset()
     pot_channels = find_potentiometer()
     # if pot_channels:
     #     for mux, channel in pot_channels:

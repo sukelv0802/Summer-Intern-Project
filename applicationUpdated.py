@@ -189,10 +189,31 @@ class MainWindow(QMainWindow):
                 response = ''
                 while True:
                     response = self.serialConnection.readline().strip()
-                    print(f"Response received: '{response.decode()}")    
+                    print(f"Response received: '{response.decode()}")
                     if 'Pause confirmed' in response.decode():
-                        print(f"Response received: '{response.decode()}")
+                        # print(f"Response received: '{response.decode()}")
                         break
+                    elif 'Mux:' in response.decode() and 'Channel:' in response.decode() and 'Temperature:' in response.decode() and 'Voltage:' in response.decode():
+                        parts = response.decode().split()
+                        mux = parts[1]
+                        channel = parts[3]
+                        temperature = parts[5]
+                        voltage = parts[7]
+                        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                        item = QTreeWidgetItem([
+                            timestamp,
+                            mux,
+                            channel,
+                            f"{temperature}°C",
+                            f"{voltage}"
+                        ])
+                        
+                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
+                            item.setBackground(1, QColor(255, 255, 0, 100))
+                            
+                        self.tree.addTopLevelItem(item)
+                        self.tree.scrollToBottom()
+                        self.apply_filter()  # Apply filter after adding new item                        
             except Exception as e:
                 print(f"Error receiving confirmation: {e}")
             self.serialConnection.close()
