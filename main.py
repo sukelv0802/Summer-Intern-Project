@@ -52,9 +52,9 @@ def enable_mux(mux_index):
     CS_PINS[mux_index].value(0)
 
 # Disable mux
-def disable_all_muxes():
-    for pin in CS_PINS:
-        pin.value(1)
+def disable_all_muxes(mux_index):
+    CS_PINS[mux_index].value(1)
+    select_channel(0xFF)
 
 # Reset mux
 def reset_mux():
@@ -64,10 +64,14 @@ def select_channel(channel):
     if 0 <= channel < CHANNELS_PER_MUX:
         WR_PIN.value(0)
         i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([channel]))
-        time.sleep(1)
+        # print("Just wrote channel") #DEBUGGING
+        # time.sleep(1)
         WR_PIN.value(1)
-    else:
-        print("Invalid Channel")
+        # print("Just latched address") #DEBUGGING
+        # time.sleep(1)
+    # else:
+    #     print("Invalid Channel")
+
 
 def discharge_input():
     GND_PIN.value(1)
@@ -86,26 +90,65 @@ def adc_to_temp(adc_value):
     voltage = (adc_value / 65535) * 3.3
     return 27 - (voltage - 0.706) / 0.001721
 
+def close_channel(channel):
+    select_channel(channel)
+    time.sleep(0.01)
+    select_channel(0xFF) 
+    time.sleep(0.01)
+    
+def reset_mux_completely():
+    # Cycle through and close all channels
+    for channel in range(CHANNELS_PER_MUX):
+        close_channel(channel)
+    
+    # Reset the MCP23017
+    reset_mux()
+    time.sleep(0.1)
+
 def find_potentiometer():
     potentiometers = []
     for mux_index in range(NUM_MUXES):
         enable_mux(mux_index)
+        time.sleep(0.05)  # Allow time for mux to stabilize after enabling
+        
         for channel in range(CHANNELS_PER_MUX):
             check_for_pause()
+            
+            # Read temperature
             temp_adc_value = temp_pin.read_u16()
             temp = adc_to_temp(temp_adc_value)
+            
+            # Open all channels, then select the current one
+            select_channel(0xFF)
+            time.sleep(0.02)
             select_channel(channel)
+            time.sleep(0.02)
+            
             discharge_input()
             EN_PIN.value(0)
+            time.sleep(0.1)  # Increased delay to allow for settling
+            
             adc_value = read_adc()
             voltage = (adc_value / 65535) * 3.3
+            
             data = f"Mux: {mux_index + 1}  Channel: {channel + 1}  Temperature: {temp:.5f}  Voltage: {voltage:.4f}"
-            time.sleep(0.2)
             sys.stdout.write(data.encode() + b'\r\n')
+            
             if adc_value > threshold:        
                 potentiometers.append((mux_index + 1, channel + 1))
+            
             EN_PIN.value(1)
-        disable_all_muxes()
+            time.sleep(0.05)
+            
+            # Forcibly close the current channel after reading
+            close_channel(channel)
+            time.sleep(0.02)  # Additional delay after closing
+        
+        # After finishing with a mux, reset it completely
+        reset_mux_completely()
+        disable_all_muxes(mux_index)
+        time.sleep(0.1)  # Allow time for mux to stabilize after disabling
+    
     return potentiometers
 
 def check_for_pause():
@@ -139,8 +182,8 @@ def check_for_reset():
 
 # Main execution
 setup_mcp23017()
-reset_mux()
+reset_mux_completely()
 threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
 while True:
     pot_channels = find_potentiometer()
-    time.sleep(1)
+    time.sleep(5)
