@@ -208,8 +208,8 @@ class MainWindow(QMainWindow):
                             f"{voltage}"
                         ])
                         
-                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
-                            item.setBackground(1, QColor(255, 255, 0, 100))
+                        # if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
+                        #     item.setBackground(1, QColor(255, 255, 0, 100))
                             
                         self.tree.addTopLevelItem(item)
                         self.tree.scrollToBottom()
@@ -248,7 +248,7 @@ class MainWindow(QMainWindow):
                                 f"{voltage}"
                             ])
                             
-                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
+                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
                                 item.setBackground(1, QColor(255, 255, 0, 100))
                             
                             self.tree.addTopLevelItem(item)
@@ -324,8 +324,8 @@ class MainWindow(QMainWindow):
             item = self.tree.topLevelItem(i)
             if self.filter_checkbox.isChecked():
                 try:
-                    pot_value = float(item.text(1))
-                    item.setHidden(not (self.threshold_value is not None and pot_value > self.threshold_value))
+                    voltage = float(item.text(4))
+                    item.setHidden(not (self.threshold_value is not None and voltage * 65535 / 3.3 > self.threshold_value))
                 except ValueError:
                     item.setHidden(True)
             else:
