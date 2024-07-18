@@ -208,8 +208,8 @@ class MainWindow(QMainWindow):
                             f"{voltage}"
                         ])
                         
-                        # if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
-                        #     item.setBackground(1, QColor(255, 255, 0, 100))
+                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
+                            item.setBackground(1, QColor(255, 255, 0, 100))
                             
                         self.tree.addTopLevelItem(item)
                         self.tree.scrollToBottom()
