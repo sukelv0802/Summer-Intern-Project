@@ -26,6 +26,9 @@ GPIOA = 0x12
 mux_num = 8
 mux_channels = 32
 
+# Global variable to tell the mux to reset or not by receiving a command
+reset_flag = False
+
 # ADC setup
 adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
 
@@ -80,14 +83,24 @@ def adc_to_temp(adc_value):
     return 27 - (voltage - 0.706) / 0.001721
 
 def find_potentiometer():
+    global reset_flag
     potentiometers = []
-    for mux_index in range(mux_num):
+    # Use while loop instead of for loop to reset iteration when 'START' command comes
+    mux_index = 0
+    while mux_index < mux_num:
         enable_mux(mux_index)
-        for channel in range(mux_channels):
+        channel = 0
+        while channel < mux_channels:
             check_for_pause()
+            # Deal with the 'START' command
+            if reset_flag:
+                mux_index = 0
+                channel = 0
+                enable_mux(mux_index)
+                reset_flag = False
+
             temp_adc_value = temp_pin.read_u16()
             temp = adc_to_temp(temp_adc_value)
-
             # Deals with the last channel of each mux
             if channel == mux_channels - 1:
                 select_channel(channel)
@@ -107,7 +120,6 @@ def find_potentiometer():
                 # 1 - 31 channel should all be fine, here is 31st channel
                 select_channel(channel - 1)
                 break
-
             select_channel(channel)
             discharge_input()
             en_pin.value(0)
@@ -120,11 +132,13 @@ def find_potentiometer():
             if adc_value > threshold:  # Define a suitable threshold based on your setup
                 potentiometers.append((mux_index + 1, channel + 1))
             en_pin.value(1)
+            channel += 1
         disable_all_muxes()
+        mux_index += 1
     return potentiometers
 
-
 def check_for_pause():
+    global reset_flag
     pull_results = poll_obj.poll(1) # '1' is how long it will wait for message before looping again (in milliseconds)
     if pull_results:
         PC_command = sys.stdin.readline().strip()
@@ -135,16 +149,17 @@ def check_for_pause():
                 if PC_command == 'RESUME':
                     # sys.stdout.write("Resume confirmed\r")
                     break
+                if PC_command == 'START':
+                    reset_flag = True
+                    break
                 else:
                     continue
-
 
 # Main execution
 setup_mcp23017()
 reset_mux()
 threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
 while True:
-    # check_for_reset()
     pot_channels = find_potentiometer()
     # if pot_channels:
     #     for mux, channel in pot_channels:

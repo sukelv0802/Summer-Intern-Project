@@ -87,16 +87,19 @@ class MainWindow(QMainWindow):
         # Button layout
         button_layout = QHBoxLayout()
         self.start_button = QPushButton("Start")
+        self.resume_button = QPushButton("Resume")
         self.stop_button = QPushButton("Stop")
         export_button = QPushButton("Export to Excel")
         clear_button = QPushButton("Clear Data")
         
         self.start_button.clicked.connect(self.start_update)
+        self.resume_button.clicked.connect(self.resume_update)
         self.stop_button.clicked.connect(self.stop_update)
         export_button.clicked.connect(self.export_to_excel)
         clear_button.clicked.connect(self.clear_data)
         
         button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.resume_button)
         button_layout.addWidget(self.stop_button)
         button_layout.addWidget(export_button)
         button_layout.addWidget(clear_button)
@@ -163,12 +166,31 @@ class MainWindow(QMainWindow):
             try:
                 com_port = self.com_combo.currentText()
                 self.serialConnection = serial.Serial(com_port, self.baudrate)
-                print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
+                # print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
+                self.serialConnection.flush()
+                self.serialConnection.write("START\r".encode())
+                self.update_flag = True
+                self.timer.start(50) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
+                self.start_button.setEnabled(False)
+                self.resume_button.setEnabled(False)
+                self.stop_button.setEnabled(True)
+                self.serialConnection.reset_input_buffer()
+            except serial.SerialException as e:
+                QMessageBox.critical(self, "Error", f"Failed to open {com_port}: {str(e)}")
+                print(f"Failed to open {com_port}: {str:e}") # Debug message
+
+    def resume_update(self):
+        if not self.update_flag:
+            try:
+                com_port = self.com_combo.currentText()
+                self.serialConnection = serial.Serial(com_port, self.baudrate)
+                # print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
                 self.serialConnection.flush()
                 self.serialConnection.write("RESUME\r".encode())
                 self.update_flag = True
                 self.timer.start(50) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
                 self.start_button.setEnabled(False)
+                self.resume_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self.serialConnection.reset_input_buffer()
             except serial.SerialException as e:
@@ -219,6 +241,7 @@ class MainWindow(QMainWindow):
             self.serialConnection.close()
             self.serialConnection = None
         self.start_button.setEnabled(True)
+        self.resume_button.setEnabled(True)
         self.stop_button.setEnabled(False)
 
     def update_text(self):
