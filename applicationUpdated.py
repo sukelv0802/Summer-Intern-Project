@@ -293,7 +293,7 @@ class MainWindow(QMainWindow):
             data = []
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
-                data.append([item.text(0), item.text(1), item.text(2)])
+                data.append([item.text(0), item.text(1), item.text(2), item.text(3), item.text(4)])
 
             filename, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx)")
             if not filename: # If the file dialog is cancelled
@@ -303,19 +303,23 @@ class MainWindow(QMainWindow):
             sheet = workbook.active
             sheet.title = "Serial Data"
             sheet['A1'] = "Timestamp"
-            sheet['B1'] = "Potentiometer"
-            sheet['C1'] = "Temperature"
+            sheet['B1'] = "Mux"
+            sheet['C1'] = "Channel"
+            sheet['D1'] = "Temperature"
+            sheet["E1"] = "Voltage"
 
             # Write data and apply conditional formatting
             yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-            for row, (timestamp, pot_value, temp_value) in enumerate(data, start=2):
+            for row, (timestamp, mux_index, channel_index, temperature, voltage) in enumerate(data, start=2):
                 sheet.cell(row=row, column=1, value=timestamp)
-                sheet.cell(row=row, column=2, value=pot_value)
-                sheet.cell(row=row, column=3, value=temp_value)
+                sheet.cell(row=row, column=2, value=mux_index)
+                sheet.cell(row=row, column=3, value=channel_index)
+                sheet.cell(row=row, column=4, value=temperature)
+                sheet.cell(row=row, column=5, value=voltage)
                 
                 try:
-                    numeric_value = float(pot_value)
-                    if self.threshold_value is not None and numeric_value > self.threshold_value:
+                    numeric_value = float(voltage)
+                    if self.threshold_value is not None and numeric_value * 65535 / 3.3 > self.threshold_value:
                         sheet.cell(row=row, column=2).fill = yellow_fill
                 except ValueError:
                     pass 
