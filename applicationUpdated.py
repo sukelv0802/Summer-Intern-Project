@@ -8,18 +8,20 @@ from openpyxl.chart import LineChart, Reference
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QTreeWidget, QTreeWidgetItem, 
                              QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, 
                              QLineEdit, QMessageBox, QHeaderView, QSplitter, QCheckBox,
-                             QStyleFactory, QComboBox, QFileDialog, QDateTimeEdit)
+                             QStyleFactory, QComboBox, QFileDialog, QDateTimeEdit,
+                             QStatusBar, QListWidget)
 from PyQt5.QtCore import QTimer, Qt, QSettings, QDateTime
 from PyQt5.QtGui import QFont, QColor
+import pyqtgraph as pg
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Serial Data Logger")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1200, 800)
 
         # Settings
-        self.settings = QSettings("Test", "SerialDataLogger")
+        self.settings = QSettings("YourCompany", "SerialDataLogger")
         self.load_settings()
 
         # Main layout
@@ -52,8 +54,8 @@ class MainWindow(QMainWindow):
         theme_label = QLabel("Theme")
         theme_label.setFont(QFont("Arial", 12, QFont.Bold))
         self.theme_combo = QComboBox()
-        self.theme_combo.addItems(QStyleFactory.keys())
-        self.theme_combo.setCurrentText(self.settings.value("theme", "Fusion"))
+        self.theme_combo.addItems(["Light", "Dark"])
+        self.theme_combo.setCurrentText(self.settings.value("theme", "Light"))
         self.theme_combo.currentTextChanged.connect(self.change_theme)
         
         options_layout.addWidget(threshold_label)
@@ -63,6 +65,7 @@ class MainWindow(QMainWindow):
         options_layout.addWidget(self.com_combo)
         options_layout.addWidget(theme_label)
         options_layout.addWidget(self.theme_combo)
+        
         options_layout.addStretch()
         
         # Tree widget
@@ -73,16 +76,10 @@ class MainWindow(QMainWindow):
         self.tree.setSortingEnabled(True)
         
         # Filter layout
-        filter_layout = QVBoxLayout()
-
-        # Timestamp range filter
-        timestamp_layout = QHBoxLayout()
-        self.start_time = QDateTimeEdit(QDateTime.currentDateTime().addDays(-1))
-        self.end_time = QDateTimeEdit(QDateTime.currentDateTime())
-        timestamp_layout.addWidget(QLabel("From:"))
-        timestamp_layout.addWidget(self.start_time)
-        timestamp_layout.addWidget(QLabel("To:"))
-        timestamp_layout.addWidget(self.end_time)
+        filter_layout = QHBoxLayout()
+        self.filter_checkbox = QCheckBox("Show only above threshold")
+        self.filter_checkbox.stateChanged.connect(self.apply_filter)
+        filter_layout.addWidget(self.filter_checkbox)
         
         # Button layout
         button_layout = QHBoxLayout()
@@ -104,11 +101,6 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(export_button)
         button_layout.addWidget(clear_button)
         
-        
-        self.filter_checkbox = QCheckBox("Show only above threshold")
-        self.filter_checkbox.stateChanged.connect(self.apply_filter)
-        options_layout.addWidget(self.filter_checkbox)
-        
         # Combine layouts
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
@@ -116,6 +108,42 @@ class MainWindow(QMainWindow):
         right_layout.addLayout(button_layout)
         right_layout.addLayout(filter_layout)
         
+        # Add a plot widget
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setBackground('w')
+        self.plot_widget.setTitle("Real-time Voltage Plot")
+        self.plot_widget.setLabel('left', "Voltage")
+        self.plot_widget.setLabel('bottom', "Time", units='s')
+        self.plot_data = {}
+        self.plot_widget.addLegend()
+    
+        # Mux selection
+        mux_label = QLabel("Select Mux")
+        mux_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.mux_combo = QComboBox()
+        self.mux_combo.addItems([f"Mux {i}" for i in range(1, 9)])  # Assuming 8 muxes
+        self.mux_combo.currentIndexChanged.connect(self.update_plot)
+        options_layout.addWidget(mux_label)
+        options_layout.addWidget(self.mux_combo)
+
+        # Channel selection
+        channel_label = QLabel("Select Channels")
+        channel_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.channel_list = QListWidget()
+        self.channel_list.setSelectionMode(QListWidget.MultiSelection)
+        for i in range(1, 33):
+            self.channel_list.addItem(f"Channel {i}")
+        self.channel_list.itemSelectionChanged.connect(self.update_plot)
+        options_layout.addWidget(channel_label)
+        options_layout.addWidget(self.channel_list)
+
+        # Enable zooming and panning
+        self.plot_widget.setMouseEnabled(x=True, y=True)
+        self.plot_widget.enableAutoRange()
+
+        # Add the plot widget to the right layout
+        right_layout.addWidget(self.plot_widget)
+
         # Add widgets to splitter
         splitter.addWidget(options_bar)
         splitter.addWidget(right_widget)
@@ -124,6 +152,10 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(splitter)
         
         self.setCentralWidget(main_widget)
+        
+        # Status bar
+        self.statusBar = QStatusBar()
+        self.setStatusBar(self.statusBar)
         
         # Serial connection
         self.baudrate = 115200
@@ -134,10 +166,12 @@ class MainWindow(QMainWindow):
         self.update_flag = False
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_text)
-        self.last_temp = None
-        self.last_pot = None
+        self.start_time = None
 
         self.change_theme(self.theme_combo.currentText())
+        
+        self.plot_data = {}
+        self.current_mux = 1
 
     def load_settings(self):
         self.move(self.settings.value("pos", self.pos()))
@@ -151,13 +185,24 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def change_theme(self, theme):
-        QApplication.setStyle(QStyleFactory.create(theme))
+        if theme == "Dark":
+            self.setStyleSheet("""
+                QWidget { background-color: #2D2D2D; color: #FFFFFF; }
+                QTreeWidget { alternate-background-color: #3D3D3D; }
+                QPushButton { background-color: #4D4D4D; border: 1px solid #5D5D5D; }
+                QLineEdit, QComboBox { background-color: #3D3D3D; border: 1px solid #5D5D5D; }
+            """)
+            self.plot_widget.setBackground('k')
+        else:
+            self.setStyleSheet("")
+            self.plot_widget.setBackground('w')
 
     def set_threshold(self):
         try:
             self.threshold_value = int(self.threshold_entry.text())
             QMessageBox.information(self, "Success", f"Threshold set to {self.threshold_value}")
-            self.apply_filter()  # Reapply filter after changing threshold
+            self.apply_filter()
+            self.statusBar.showMessage(f"Threshold set to {self.threshold_value}")
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid integer value for the threshold.")
 
@@ -166,76 +211,50 @@ class MainWindow(QMainWindow):
             try:
                 com_port = self.com_combo.currentText()
                 self.serialConnection = serial.Serial(com_port, self.baudrate)
-                # print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
                 self.serialConnection.flush()
                 self.serialConnection.write("START\r".encode())
                 self.update_flag = True
-                self.timer.start(50) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
+                self.timer.start(50)
                 self.start_button.setEnabled(False)
                 self.resume_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self.serialConnection.reset_input_buffer()
+                self.start_time = time.time()
+                self.statusBar.showMessage(f"Connected to {com_port} at {self.baudrate} baud")
             except serial.SerialException as e:
                 QMessageBox.critical(self, "Error", f"Failed to open {com_port}: {str(e)}")
-                print(f"Failed to open {com_port}: {str:e}") # Debug message
 
     def resume_update(self):
         if not self.update_flag:
             try:
                 com_port = self.com_combo.currentText()
                 self.serialConnection = serial.Serial(com_port, self.baudrate)
-                # print(f"Connected to {com_port} at {self.baudrate} baud.") # Debug message                
                 self.serialConnection.flush()
                 self.serialConnection.write("RESUME\r".encode())
                 self.update_flag = True
-                self.timer.start(50) # CHANGE IF NEEDS TO BE FASTER/SLOWER, no faster than freq in main
+                self.timer.start(50)
                 self.start_button.setEnabled(False)
                 self.resume_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self.serialConnection.reset_input_buffer()
+                self.statusBar.showMessage(f"Resumed connection to {com_port}")
             except serial.SerialException as e:
                 QMessageBox.critical(self, "Error", f"Failed to open {com_port}: {str(e)}")
-                print(f"Failed to open {com_port}: {str:e}") # Debug message
 
     def stop_update(self):
         self.update_flag = False
         self.timer.stop()
         if self.serialConnection:
-            # Send PAUSE command
             self.serialConnection.flush()
             self.serialConnection.write("PAUSE\r".encode())
-            print("Pause command sent")
             try:
-                # Wait for a response with a timeout
-                self.serialConnection.timeout = 0.1  # Set a timeout for reading (e.g., 2 seconds)
-                response = ''
+                self.serialConnection.timeout = 0.1
                 while True:
                     response = self.serialConnection.readline().strip()
-                    print(f"Response received: '{response.decode()}")
                     if 'Pause confirmed' in response.decode():
-                        # print(f"Response received: '{response.decode()}")
                         break
                     elif 'Mux:' in response.decode() and 'Channel:' in response.decode() and 'Temperature:' in response.decode() and 'Voltage:' in response.decode():
-                        parts = response.decode().split()
-                        mux = parts[1]
-                        channel = parts[3]
-                        temperature = parts[5]
-                        voltage = parts[7]
-                        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                        item = QTreeWidgetItem([
-                            timestamp,
-                            mux,
-                            channel,
-                            f"{temperature}°C",
-                            f"{voltage}"
-                        ])
-                        
-                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
-                            item.setBackground(1, QColor(255, 255, 0, 100))
-                            
-                        self.tree.addTopLevelItem(item)
-                        self.tree.scrollToBottom()
-                        self.apply_filter()  # Apply filter after adding new item                        
+                        self.process_data(response.decode())
             except Exception as e:
                 print(f"Error receiving confirmation: {e}")
             self.serialConnection.close()
@@ -243,101 +262,98 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(True)
         self.resume_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+        self.statusBar.showMessage("Connection paused")
 
     def update_text(self):
         if self.update_flag and self.serialConnection:
             try:
                 data = self.serialConnection.readline()
-                print(f"Data received: {data}") # Debug message
                 if data == b"EOF":
                     self.stop_update()
                 else:
                     value = data.decode('utf-8').strip()
-                    print(f"Decoded value: {value}") # Debug message
-                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                    try:
-                        if "Mux:" in value and "Channel:" in value and "Temperature:" in value and "Voltage:" in value:
-                            parts = value.split()
-                            mux = parts[1]
-                            channel = parts[3]
-                            temperature = parts[5]
-                            voltage = parts[7]
-                            
-                            item = QTreeWidgetItem([
-                                timestamp,
-                                mux,
-                                channel,
-                                f"{temperature}°C",
-                                f"{voltage}"
-                            ])
-                            
-                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
-                                item.setBackground(1, QColor(255, 255, 0, 100))
-                            
-                            self.tree.addTopLevelItem(item)
-                            self.tree.scrollToBottom()
-                            self.apply_filter()  # Apply filter after adding new item
-                    except ValueError:
-                        self.tree.addTopLevelItem(QTreeWidgetItem([timestamp, value, "", "", ""]))
-                        self.apply_filter()  # Apply filter even for invalid data
+                    self.process_data(value)
             except serial.SerialException as e:
                 self.stop_update()
                 QMessageBox.critical(self, "Error", f"Serial communication error: {str(e)}")
 
+    def process_data(self, value):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        try:
+            if "Mux:" in value and "Channel:" in value and "Temperature:" in value and "Voltage:" in value:
+                parts = value.split()
+                mux = int(parts[1])
+                channel = int(parts[3])
+                temperature = float(parts[5])
+                voltage = float(parts[7])
+                
+                item = QTreeWidgetItem([
+                    timestamp,
+                    str(mux),
+                    str(channel),
+                    f"{temperature:.2f}°C",
+                    f"{voltage:.4f}"
+                ])
+                
+                if self.threshold_value is not None and voltage * 65535 / 3.3 > self.threshold_value:
+                    item.setBackground(1, QColor(255, 255, 0, 100))
+                
+                self.tree.addTopLevelItem(item)
+                self.tree.scrollToBottom()
+                self.apply_filter()
+
+                # Store data for plotting
+                if mux not in self.plot_data:
+                    self.plot_data[mux] = {}
+                if channel not in self.plot_data[mux]:
+                    self.plot_data[mux][channel] = {'x': [], 'y': []}
+                
+                current_time = time.time() - self.start_time
+                self.plot_data[mux][channel]['x'].append(current_time)
+                self.plot_data[mux][channel]['y'].append(voltage)
+
+                self.update_plot()
+
+        except ValueError:
+            self.tree.addTopLevelItem(QTreeWidgetItem([timestamp, value, "", "", ""]))
+            self.apply_filter()
+
+    def update_plot(self):
+        self.plot_widget.clear()
+        selected_mux = int(self.mux_combo.currentText().split()[1])
+        selected_channels = [int(item.text().split()[1]) for item in self.channel_list.selectedItems()]
+
+        if selected_mux in self.plot_data:
+            for channel in self.plot_data[selected_mux]:
+                if not selected_channels or channel in selected_channels:
+                    self.plot_widget.plot(
+                        self.plot_data[selected_mux][channel]['x'],
+                        self.plot_data[selected_mux][channel]['y'],
+                        pen=(channel * 20) % 256,
+                        name=f'Channel {channel}'
+                    )
+
+        self.plot_widget.addLegend()
+
     def export_to_excel(self):
-        if self.tree.topLevelItemCount() == 0:
+        data = []
+        for i in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(i)
+            data.append([item.text(j) for j in range(5)])
+        
+        if not data:
             QMessageBox.warning(self, "No Data", "There is no data to export.")
             return
 
         try:
-            data = []
-            for i in range(self.tree.topLevelItemCount()):
-                item = self.tree.topLevelItem(i)
-                data.append([item.text(0), item.text(1), item.text(2), item.text(3), item.text(4)])
+            df = pd.DataFrame(data, columns=["Timestamp", "Mux", "Channel", "Temperature", "Voltage"])
 
             filename, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx)")
-            if not filename: # If the file dialog is cancelled
+            if not filename:
                 return 
 
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
-            sheet.title = "Serial Data"
-            sheet['A1'] = "Timestamp"
-            sheet['B1'] = "Mux"
-            sheet['C1'] = "Channel"
-            sheet['D1'] = "Temperature"
-            sheet["E1"] = "Voltage"
+            df.to_excel(filename, index=False)
 
-            # Write data and apply conditional formatting
-            yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-            for row, (timestamp, mux_index, channel_index, temperature, voltage) in enumerate(data, start=2):
-                sheet.cell(row=row, column=1, value=timestamp)
-                sheet.cell(row=row, column=2, value=mux_index)
-                sheet.cell(row=row, column=3, value=channel_index)
-                sheet.cell(row=row, column=4, value=temperature)
-                sheet.cell(row=row, column=5, value=voltage)
-                
-                try:
-                    numeric_value = float(voltage)
-                    if self.threshold_value is not None and numeric_value * 65535 / 3.3 > self.threshold_value:
-                        sheet.cell(row=row, column=2).fill = yellow_fill
-                except ValueError:
-                    pass 
-
-            # Auto-adjust column widths
-            for column in sheet.columns:
-                max_length = 0
-                column_letter = openpyxl.utils.get_column_letter(column[0].column)
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(cell.value)
-                    except:
-                        pass
-                adjusted_width = (max_length + 2)
-                sheet.column_dimensions[column_letter].width = adjusted_width
-
-            workbook.save(filename)
             QMessageBox.information(self, "Success", f"Data has been successfully exported to {filename}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to export data: {str(e)}")
@@ -345,6 +361,9 @@ class MainWindow(QMainWindow):
     def clear_data(self):
         self.tree.clear()
         self.filter_checkbox.setChecked(False)
+        self.plot_widget.clear()
+        self.plot_data = {}
+        self.start_time = None
         
     def apply_filter(self):
         for i in range(self.tree.topLevelItemCount()):
