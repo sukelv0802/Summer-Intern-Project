@@ -28,6 +28,7 @@ mux_channels = 32
 
 # Global variable to tell the mux to reset or not by receiving a command
 reset_flag = False
+channel_period = 0.1
 
 # ADC setup
 adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
@@ -71,7 +72,7 @@ def select_channel(channel):
 
 def discharge_input():
     gnd_pin.value(1)
-    time.sleep(0.05)
+    time.sleep(channel_period * 0.1)
     gnd_pin.value(0)
 
 def read_adc():
@@ -110,7 +111,7 @@ def find_potentiometer():
                 voltage = (adc_value / 65535) * 3.3
                 data = f"Mux: {mux_index + 1}  Channel: {channel + 1}  Temperature: {temp:.5f}  Voltage: {voltage:.4f}"
                 # print(data)
-                time.sleep(0.1)  # Allow the multiplexer to settle and ADC to stabilize
+                time.sleep(channel_period * 0.9)  # Allow the multiplexer to settle and ADC to stabilize
                 sys.stdout.write(data.encode() + b'\r\n')
                 if adc_value > threshold:  # Define a suitable threshold based on your setup
                     potentiometers.append((mux_index + 1, channel + 1))
@@ -127,7 +128,7 @@ def find_potentiometer():
             voltage = (adc_value / 65535) * 3.3
             data = f"Mux: {mux_index + 1}  Channel: {channel + 1}  Temperature: {temp:.5f}  Voltage: {voltage:.4f}"
             # print(data)
-            time.sleep(0.1)  # Allow the multiplexer to settle and ADC to stabilize
+            time.sleep(channel_period * 0.9)  # Allow the multiplexer to settle and ADC to stabilize
             sys.stdout.write(data.encode() + b'\r\n')
             if adc_value > threshold:  # Define a suitable threshold based on your setup
                 potentiometers.append((mux_index + 1, channel + 1))
@@ -166,4 +167,4 @@ while True:
     #         print(f"Potentiometer found on Mux {mux}, Channel {channel}")
     # else:
     #     print("Potentiometer not found on any channel")
-    time.sleep(1)
+    # time.sleep(1)
