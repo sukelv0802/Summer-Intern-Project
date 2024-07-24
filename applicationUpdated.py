@@ -389,8 +389,13 @@ class MainWindow(QMainWindow):
                         # Check if a complete cycle has finished, and wait for the cycle period
                             if channel == 31 and mux == 8:
                                 self.stop_update()
-                                time.sleep(self.cycle_period_value - 256 * 2 * self.channel_period_value / 1000)
-                                self.start_update()
+                                cycle_delay = self.cycle_period_value * 1000 - 256 * 2 * self.channel_period_value
+                                if cycle_delay > 0:
+                                    QTimer.singleShot(cycle_delay, self.start_update)
+                                else:
+                                    self.start_update()
+                                # time.sleep(self.cycle_period_value - 256 * 2 * self.channel_period_value / 1000)
+                                # self.start_update()
 
                     except ValueError:
                         self.tree.addTopLevelItem(QTreeWidgetItem([timestamp, value, "", "", ""]))
