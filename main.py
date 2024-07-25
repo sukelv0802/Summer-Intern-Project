@@ -36,7 +36,7 @@ adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
 mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # These are connected to each CS pin on muxes
 wr_pin = Pin(20, Pin.OUT) # This is connected to the WR pins
 en_pin = Pin(21, Pin.OUT) # This is connected to the EN pins
-gnd_pin = Pin(22, Pin.OUT)
+gnd_pin = Pin(22, Pin.OUT) # This is connected to the GND pins (the 23rd pin on the mux, not 24th pin)
 temp_pin = machine.ADC(4)
 
 # Configure GPIOA pins as outputs
@@ -67,8 +67,6 @@ def select_channel(channel):
         wr_pin.value(0)
         i2c.writeto_mem(MCP23017_ADDR, GPIOA, bytes([channel]))
         wr_pin.value(1)
-    # else:
-    #     print("Invalid Channel")
 
 def discharge_input():
     gnd_pin.value(1)
@@ -83,9 +81,8 @@ def adc_to_temp(adc_value):
     voltage = (adc_value / 65535) * 3.3
     return 27 - (voltage - 0.706) / 0.001721
 
-def find_potentiometer():
+def read_voltage():
     global reset_flag
-    potentiometers = []
     # Use while loop instead of for loop to reset iteration when 'START' command comes
     mux_index = 0
     while mux_index < mux_num:
@@ -113,8 +110,6 @@ def find_potentiometer():
                 # print(data)
                 time.sleep(channel_period * 0.9)  # Allow the multiplexer to settle and ADC to stabilize
                 sys.stdout.write(data.encode() + b'\r\n')
-                if adc_value > threshold:  # Define a suitable threshold based on your setup
-                    potentiometers.append((mux_index + 1, channel + 1))
                 en_pin.value(1)
                 # Just randomly select a channel after reading the data of last channel
                 # Avoid the selecting stops at the last channel before jumping out of the loop
@@ -130,13 +125,10 @@ def find_potentiometer():
             # print(data)
             time.sleep(channel_period * 0.9)  # Allow the multiplexer to settle and ADC to stabilize
             sys.stdout.write(data.encode() + b'\r\n')
-            if adc_value > threshold:  # Define a suitable threshold based on your setup
-                potentiometers.append((mux_index + 1, channel + 1))
             en_pin.value(1)
             channel += 1
         disable_all_muxes()
         mux_index += 1
-    return potentiometers
 
 def check_for_pause():
     global reset_flag
@@ -159,12 +151,5 @@ def check_for_pause():
 # Main execution
 setup_mcp23017()
 reset_mux()
-threshold = 15000  # Example threshold, adjust based on potentiometer's expected ADC output
 while True:
-    pot_channels = find_potentiometer()
-    # if pot_channels:
-    #     for mux, channel in pot_channels:
-    #         print(f"Potentiometer found on Mux {mux}, Channel {channel}")
-    # else:
-    #     print("Potentiometer not found on any channel")
-    # time.sleep(1)
+    read_voltage()
