@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
         self.theme_combo.setCurrentText(self.settings.value("theme", "Light"))
         self.theme_combo.currentTextChanged.connect(self.change_theme)
         
+        # Option bars and input bars layout
         options_layout.addWidget(threshold_label)
         options_layout.addWidget(self.threshold_entry)
         options_layout.addWidget(confirm_button)
@@ -310,7 +311,7 @@ class MainWindow(QMainWindow):
                             f"{voltage}"
                         ])
                         
-                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
+                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
                             item.setBackground(1, QColor(255, 255, 0, 100))
                             
                         self.tree.addTopLevelItem(item)
@@ -369,7 +370,7 @@ class MainWindow(QMainWindow):
                                 f"{voltage}"
                             ])
                             
-                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
+                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 < self.threshold_value:
                                 item.setBackground(1, QColor(255, 255, 0, 100))
                             
                             self.tree.addTopLevelItem(item)
@@ -458,7 +459,7 @@ class MainWindow(QMainWindow):
                 
                 try:
                     numeric_value = float(voltage)
-                    if self.threshold_value is not None and numeric_value * 65535 / 3.3 > self.threshold_value:
+                    if self.threshold_value is not None and numeric_value * 65535 / 3.3 < self.threshold_value:
                         sheet.cell(row=row, column=2).fill = yellow_fill
                 except ValueError:
                     pass 
@@ -494,7 +495,7 @@ class MainWindow(QMainWindow):
             if self.filter_checkbox.isChecked():
                 try:
                     voltage = float(item.text(4))
-                    item.setHidden(not (self.threshold_value is not None and voltage * 65535 / 3.3 > self.threshold_value))
+                    item.setHidden(not (self.threshold_value is not None and voltage * 65535 / 3.3 < self.threshold_value))
                 except ValueError:
                     item.setHidden(True)
             else:
