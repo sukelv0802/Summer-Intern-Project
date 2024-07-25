@@ -59,14 +59,6 @@ class MainWindow(QMainWindow):
         self.com_combo.addItems([f"COM{i}" for i in range(1, 21)])
         self.com_combo.setCurrentText(self.settings.value("com_port", "COM10"))
         
-        # Theme selection
-        theme_label = QLabel("Theme")
-        theme_label.setFont(QFont("Arial", 12, QFont.Bold))
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["Light", "Dark"])
-        self.theme_combo.setCurrentText(self.settings.value("theme", "Light"))
-        self.theme_combo.currentTextChanged.connect(self.change_theme)
-        
         options_layout.addWidget(threshold_label)
         options_layout.addWidget(self.threshold_entry)
         options_layout.addWidget(confirm_button)
@@ -75,8 +67,6 @@ class MainWindow(QMainWindow):
         options_layout.addWidget(set_cycle_period_button)
         options_layout.addWidget(com_label)
         options_layout.addWidget(self.com_combo)
-        options_layout.addWidget(theme_label)
-        options_layout.addWidget(self.theme_combo)
 
         options_layout.addStretch()
         
@@ -185,8 +175,6 @@ class MainWindow(QMainWindow):
         self.channel_period_value = 50
         self.cycle_period_value = 60
 
-        self.change_theme(self.theme_combo.currentText())
-
         self.plot_data = {}
         self.current_mux = 1
 
@@ -198,29 +186,15 @@ class MainWindow(QMainWindow):
         self.settings.setValue("pos", self.pos())
         self.settings.setValue("size", self.size())
         self.settings.setValue("com_port", self.com_combo.currentText())
-        self.settings.setValue("theme", self.theme_combo.currentText())
         super().closeEvent(event)
-
-    def change_theme(self, theme):
-        if theme == "Dark":
-            self.setStyleSheet("""
-                QWidget { background-color: #2D2D2D; color: #FFFFFF; }
-                QTreeWidget { alternate-background-color: #3D3D3D; }
-                QPushButton { background-color: #4D4D4D; border: 1px solid #5D5D5D; }
-                QLineEdit, QComboBox { background-color: #3D3D3D; border: 1px solid #5D5D5D; }
-            """)
-            self.plot_widget.setBackground('k')
-        else:
-            self.setStyleSheet("")
-            self.plot_widget.setBackground('w')
 
     def set_threshold(self):
         try:
-            self.threshold_value = int(self.threshold_entry.text())
+            self.threshold_value = float(self.threshold_entry.text())
             QMessageBox.information(self, "Success", f"Threshold set to {self.threshold_value}")
             self.apply_filter()  # Reapply filter after changing threshold
         except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a valid integer value for the threshold.")
+            QMessageBox.warning(self, "Invalid Input", "Please enter a valid value for the threshold.")
 
     def set_cycle_period(self):
         try:
@@ -310,8 +284,8 @@ class MainWindow(QMainWindow):
                             f"{voltage}"
                         ])
                         
-                        if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
-                            item.setBackground(1, QColor(255, 255, 0, 100))
+                        if self.threshold_value is not None and float(voltage) < self.threshold_value:
+                            item.setBackground(4, QColor(255, 255, 0, 100))
                             
                         self.tree.addTopLevelItem(item)
                         self.tree.scrollToBottom()
@@ -369,8 +343,8 @@ class MainWindow(QMainWindow):
                                 f"{voltage}"
                             ])
                             
-                            if self.threshold_value is not None and float(voltage) * 65535 / 3.3 > self.threshold_value:
-                                item.setBackground(1, QColor(255, 255, 0, 100))
+                            if self.threshold_value is not None and float(voltage) < self.threshold_value:
+                                item.setBackground(4, QColor(255, 255, 0, 100))
                             
                             self.tree.addTopLevelItem(item)
                             self.tree.scrollToBottom()
@@ -458,8 +432,8 @@ class MainWindow(QMainWindow):
                 
                 try:
                     numeric_value = float(voltage)
-                    if self.threshold_value is not None and numeric_value * 65535 / 3.3 > self.threshold_value:
-                        sheet.cell(row=row, column=2).fill = yellow_fill
+                    if self.threshold_value is not None and numeric_value < self.threshold_value:
+                        sheet.cell(row=row, column=5).fill = yellow_fill
                 except ValueError:
                     pass 
 
@@ -494,7 +468,7 @@ class MainWindow(QMainWindow):
             if self.filter_checkbox.isChecked():
                 try:
                     voltage = float(item.text(4))
-                    item.setHidden(not (self.threshold_value is not None and voltage * 65535 / 3.3 > self.threshold_value))
+                    item.setHidden(not (self.threshold_value is not None and voltage < self.threshold_value))
                 except ValueError:
                     item.setHidden(True)
             else:
