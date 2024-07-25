@@ -20,6 +20,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Serial Data Logger")
         self.setGeometry(100, 100, 1000, 600)
+        self.cycle_count = 0
+        self.data_point_count = 0
 
         # Settings
         self.settings = QSettings("Test", "SerialDataLogger")
@@ -142,7 +144,7 @@ class MainWindow(QMainWindow):
         self.plot.setBackground('w')
         self.plot.setTitle("Real-time Voltage Plot")
         self.plot.setLabel('left', "Voltage")
-        self.plot.setLabel('bottom', "Time", units='s')
+        self.plot.setLabel('bottom', "Data Point Count")
         self.plot.addLegend()
         
         # Enable zooming and panning
@@ -358,6 +360,9 @@ class MainWindow(QMainWindow):
                             self.tree.addTopLevelItem(item)
                             self.tree.scrollToBottom()
                             self.apply_filter()  # Apply filter after adding new item
+                            
+                            # Increment data point count
+                            self.data_point_count += 1
 
                             # Store data for plotting
                             if mux not in self.plot_data:
@@ -366,11 +371,12 @@ class MainWindow(QMainWindow):
                                 self.plot_data[mux][channel] = {'x': [], 'y': []}
                 
                             current_time = time.time() - self.start_time
-                            self.plot_data[mux][channel]['x'].append(current_time)
+                            self.plot_data[mux][channel]['x'].append(self.data_point_count)
                             self.plot_data[mux][channel]['y'].append(voltage)
 
                         # Check if a complete cycle has finished, and wait for the cycle period
                             if channel == 31 and mux == 8:
+                                self.cycle_count += 1
                                 self.stop_update()
                                 cycle_delay = self.cycle_period_value * 1000 - 256 * 2 * self.channel_period_value
                                 if cycle_delay > 0:
@@ -395,7 +401,7 @@ class MainWindow(QMainWindow):
         if selected_mux in self.plot_data:
             for channel in self.plot_data[selected_mux]:
                 if not selected_channels or channel in selected_channels:
-                    x_data = np.array(self.plot_data[selected_mux][channel]['x'], dtype=float)
+                    x_data = np.array(self.plot_data[selected_mux][channel]['x'], dtype=int)
                     y_data = np.array(self.plot_data[selected_mux][channel]['y'], dtype=float)
                     self.plot.plot(
                         x_data,
