@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         
         # Filter layout
         filter_layout = QHBoxLayout()
-        self.filter_checkbox = QCheckBox("Show only above threshold")
+        self.filter_checkbox = QCheckBox("Show only below threshold")
         self.filter_checkbox.stateChanged.connect(self.apply_filter)
         filter_layout.addWidget(self.filter_checkbox)        
         
