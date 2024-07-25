@@ -33,9 +33,9 @@ channel_period = 0.1
 # ADC setup
 adc = ADC(Pin(27))  # Assuming GPIO 27 is ADC capable
 
-mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # These are connected to each CS pin on muxes
-wr_pin = Pin(20, Pin.OUT) # This is connected to the WR pins
-en_pin = Pin(21, Pin.OUT) # This is connected to the EN pins
+mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # These are connected to each CS pin on muxes (the 20th pin on the mux)
+wr_pin = Pin(20, Pin.OUT) # This is connected to the WR pins (the 21st pin on the mux)
+en_pin = Pin(21, Pin.OUT) # This is connected to the EN pins (the 22nd pin on the mux)
 gnd_pin = Pin(22, Pin.OUT) # This is connected to the GND pins (the 23rd pin on the mux, not 24th pin)
 temp_pin = machine.ADC(4)
 
