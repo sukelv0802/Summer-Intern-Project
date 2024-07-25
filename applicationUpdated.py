@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QTreeWidget, QTreeWidget
                              QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, 
                              QLineEdit, QMessageBox, QHeaderView, QSplitter, QCheckBox,
                              QStyleFactory, QComboBox, QFileDialog, QDateTimeEdit, 
-                             QStatusBar, QListWidget)
+                             QStatusBar, QListWidget, QTabWidget)
 from PyQt5.QtCore import QTimer, Qt, QSettings, QDateTime
 from PyQt5.QtGui import QFont, QColor
 import pyqtgraph as pg
@@ -68,7 +68,34 @@ class MainWindow(QMainWindow):
         options_layout.addWidget(com_label)
         options_layout.addWidget(self.com_combo)
 
+        # Mux selection
+        mux_label = QLabel("Select Mux")
+        mux_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.mux_combo = QComboBox()
+        self.mux_combo.addItems([f"Mux {i}" for i in range(1, 9)])  # Assuming 8 muxes
+        self.mux_combo.currentIndexChanged.connect(self.update_plot)
+        options_layout.addWidget(mux_label)
+        options_layout.addWidget(self.mux_combo)
+
+        # Channel selection
+        channel_label = QLabel("Select Channels")
+        channel_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.channel_list = QListWidget()
+        self.channel_list.setSelectionMode(QListWidget.MultiSelection)
+        for i in range(1, 33):
+            self.channel_list.addItem(f"Channel {i}")
+        self.channel_list.itemSelectionChanged.connect(self.update_plot)
+        options_layout.addWidget(channel_label)
+        options_layout.addWidget(self.channel_list)
+
         options_layout.addStretch()
+        
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        
+        # Data tab
+        self.data_widget = QWidget()
+        data_layout = QVBoxLayout(self.data_widget)
         
         # Tree widget
         self.tree = QTreeWidget()
@@ -78,10 +105,10 @@ class MainWindow(QMainWindow):
         self.tree.setSortingEnabled(True)
         
         # Filter layout
-        filter_layout = QVBoxLayout()
+        filter_layout = QHBoxLayout()
         self.filter_checkbox = QCheckBox("Show only above threshold")
         self.filter_checkbox.stateChanged.connect(self.apply_filter)
-        options_layout.addWidget(self.filter_checkbox)        
+        filter_layout.addWidget(self.filter_checkbox)        
         
         # Button layout
         button_layout = QHBoxLayout()
@@ -103,52 +130,34 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(export_button)
         button_layout.addWidget(clear_button)
         
-        # Combine layouts
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.addWidget(self.tree)
-        right_layout.addLayout(button_layout)
-        right_layout.addLayout(filter_layout)
+        data_layout.addWidget(self.tree)
+        data_layout.addLayout(button_layout)
+        data_layout.addLayout(filter_layout)
         
-        # Add a plot widget
-        self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground('w')
-        self.plot_widget.setTitle("Real-time Voltage Plot")
-        self.plot_widget.setLabel('left', "Voltage")
-        self.plot_widget.setLabel('bottom', "Time", units='s')
-        self.plot_data = {}
-        self.plot_widget.addLegend()
-    
-        # Mux selection
-        mux_label = QLabel("Select Mux")
-        mux_label.setFont(QFont("Arial", 12, QFont.Bold))
-        self.mux_combo = QComboBox()
-        self.mux_combo.addItems([f"Mux {i}" for i in range(1, 9)])  # Assuming 8 muxes
-        self.mux_combo.currentIndexChanged.connect(self.update_plot)
-        options_layout.addWidget(mux_label)
-        options_layout.addWidget(self.mux_combo)
-
-        # Channel selection
-        channel_label = QLabel("Select Channels")
-        channel_label.setFont(QFont("Arial", 12, QFont.Bold))
-        self.channel_list = QListWidget()
-        self.channel_list.setSelectionMode(QListWidget.MultiSelection)
-        for i in range(1, 33):
-            self.channel_list.addItem(f"Channel {i}")
-        self.channel_list.itemSelectionChanged.connect(self.update_plot)
-        options_layout.addWidget(channel_label)
-        options_layout.addWidget(self.channel_list)
-
+        # Plot tab
+        self.plot_widget = QWidget()
+        plot_layout = QVBoxLayout(self.plot_widget)
+        
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground('w')
+        self.plot.setTitle("Real-time Voltage Plot")
+        self.plot.setLabel('left', "Voltage")
+        self.plot.setLabel('bottom', "Time", units='s')
+        self.plot.addLegend()
+        
         # Enable zooming and panning
-        self.plot_widget.setMouseEnabled(x=True, y=True)
-        self.plot_widget.enableAutoRange()
-
-        # Add the plot widget to the right layout
-        right_layout.addWidget(self.plot_widget)
-
+        self.plot.setMouseEnabled(x=True, y=True)
+        self.plot.enableAutoRange()
+        
+        plot_layout.addWidget(self.plot)
+        
+        # Add tabs to tab widget
+        self.tab_widget.addTab(self.data_widget, "Data")
+        self.tab_widget.addTab(self.plot_widget, "Plot")
+        
         # Add widgets to splitter
         splitter.addWidget(options_bar)
-        splitter.addWidget(right_widget)
+        splitter.addWidget(self.tab_widget)
         splitter.setStretchFactor(1, 1) 
         
         main_layout.addWidget(splitter)
@@ -379,7 +388,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Serial communication error: {str(e)}")
 
     def update_plot(self):
-        self.plot_widget.clear()
+        self.plot.clear()
         selected_mux = int(self.mux_combo.currentText().split()[1])
         selected_channels = [int(item.text().split()[1]) for item in self.channel_list.selectedItems()]
 
@@ -388,14 +397,14 @@ class MainWindow(QMainWindow):
                 if not selected_channels or channel in selected_channels:
                     x_data = np.array(self.plot_data[selected_mux][channel]['x'], dtype=float)
                     y_data = np.array(self.plot_data[selected_mux][channel]['y'], dtype=float)
-                    self.plot_widget.plot(
+                    self.plot.plot(
                         x_data,
                         y_data,
                         pen=(channel * 20) % 256,
                         name=f'Channel {channel}'
                     )
 
-        self.plot_widget.addLegend()
+        self.plot.addLegend()
 
     def export_to_excel(self):
         if self.tree.topLevelItemCount() == 0:
@@ -458,7 +467,7 @@ class MainWindow(QMainWindow):
     def clear_data(self):
         self.tree.clear()
         self.filter_checkbox.setChecked(False)
-        self.plot_widget.clear()
+        self.plot.clear()
         self.plot_data = {}
         self.start_time = None
         
