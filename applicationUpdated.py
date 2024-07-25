@@ -15,6 +15,12 @@ from PyQt5.QtCore import QTimer, Qt, QSettings, QDateTime
 from PyQt5.QtGui import QFont, QColor
 import pyqtgraph as pg
 
+
+"""
+Main application window for the Serial Data Logger.
+
+This class sets up the GUI, manages serial communication, and handles data logging and visualization.
+"""
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
