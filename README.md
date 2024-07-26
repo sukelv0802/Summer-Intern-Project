@@ -55,7 +55,7 @@ You should be able to see main.py.
 - The `channel_period_value` in `applicationUpdated.py` is **NOT** the actual frequency. However, it should be corresponding to the `channel_period` in `main.py`, typically, half of it for convenience. Also, the unit for `channel_period_value` is *ms*. (e.g. if `channel_period` is 0.1 in `main.py`, then `channel_period_value` should be 50 in `applicationUpdated.py`)
 - When connecting the Raspberry Pi Pico to the PC, make sure Pico is disconnected. Otherwise, thread blocking might occur.
 - Power off the constant voltage source when connecting the Raspberry Pi Pico to the PC.
-- The threshold voltage for Raspberry Pi Pico is 3.3V, so the constant voltage source can be no larger than 4V
+- The max voltage for Raspberry Pi Pico is 3.3V, so the constant voltage source should be no larger than 4V
 
 ## Operational Controls
 - **Start**: Begins the data acquisition process and reset the reading to mux1 channel1. But actually you should only use this button when launching the project.
@@ -70,7 +70,7 @@ You should be able to see main.py.
 
 ## Potential Problems
 1. The `check_for_pause()` function in `main.py` is not robust, changing them might cause unexpected errors or crashes. 
-2. `star_update`, `resume_update` and `stop_update` functions in `applicationUpdate.py` are not robust, changing them might cause unexpected errors or crashes.
+2. `start_update`, `resume_update` and `stop_update` functions in `applicationUpdate.py` are not robust, changing them might cause unexpected errors or crashes.
 3. `START` command is used for reset the selection from mux1 channel1. But in the UI window, you should press `STOP` button before pressing `START` button to function properly, or it just behaves like `RESUME` button. (If `START` still doesn't behave properly after pressing `STOP`, try this process again)
 4. When the program keeps receiving data for a long time (several hours) without stop, there might will be a short stuck when pressing `Stop` button.
 
@@ -80,7 +80,7 @@ You should be able to see main.py.
 - Have a way to name the individual mux and channel numbers (maybe have a column next to the "select channels" box that allows for this)
 - Add time robustness. Though some problems don't happen at first, they happen after a while (try leaving the application running overnight and see if it slows down).
 - Have a tab that shows essentially a "TLDR" of every single mux and channel that is being read. For example, this tab can be similar to an excel-like grid page with every channel, and if an open is detected, highlight the channel cell red, as well as a number next to it that indicates how many times it has been detected as open.
-
+- Further stress tests
 
 Raspberry Pi Pico Pinout Image:
 ![PicoPinout.png](PicoPinout.png)
