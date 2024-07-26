@@ -5,6 +5,7 @@ Team Members:
 2. Chenyang Hu
 
 ----------------------**Introduction**----------------------
+- Only two python scripts will be used in this project, ***main.py*** and ***applicationUpdated.py***
 - The python script ***main.py*** is designed for use with the Raspberry Pi Pico microcontroller to manage data acquisition from multiple sensors through a series of multiplexers. It utilizes UART for serial communication with a host computer, I2C for interfacing with an MCP23017 I/O expander that controls 8 ADG732 multiplexers, and ADC for reading sensor data. The script supports dynamic control via stdin and stdout, allowing operations like pausing and resuming data collection.
 - The Python script ***applicationUpdated.py*** serves as a GUI-based control and monitoring system for a Raspberry Pi Pico-based data acquisition setup. It allows users to start, pause, and resume data collection, set operational parameters like thresholds and cycle periods, and visualize the acquired data in real-time. Additionally, the application supports exporting collected data to Excel for further analysis.
 
@@ -29,7 +30,7 @@ Team Members:
 
 ----------------------**Additional Notes**----------------------
 1. Modify the script parameters such as **channel_period** in ***main.py*** based on the specific timing and performance requirements of your sensors and multiplexers. The unit of **channel_period** is *s*. (e.g. **channel_period** = 0.1 means a frequecny of 10Hz)
-2. The **channel_period_value** in ***applicationUpdated.py*** is NOT the actual frequecny. However, it should be corresponding to the **channel_period** in ***main.py***, typically, half of it for convenience. Also, the unit for **channel_period_value** is *ms*. (e.g. if **channel_period** is 0.1 in ***main.py***, then **channel_period_value** should be 50 in ***applicationUpdated.py***)
+2. The **channel_period_value** in ***applicationUpdated.py*** is **NOT** the actual frequecny. However, it should be corresponding to the **channel_period** in ***main.py***, typically, half of it for convenience. Also, the unit for **channel_period_value** is *ms*. (e.g. if **channel_period** is 0.1 in ***main.py***, then **channel_period_value** should be 50 in ***applicationUpdated.py***)
 3. When connecting the Raspberry Pi Pico to the PC, make sure Pico is disconnected. Otherwise, thread blocking might occur.
 4. Power off the constant voltage source when connecting the Raspberry Pi Pico to the PC.
 5. The threshold voltage for Raspberry Pi Pico is 3.3V, so the constant voltage source can be no larger than 4V
@@ -48,7 +49,11 @@ Team Members:
 
 ----------------------**Potential Problems**----------------------
 1. The **check_for_pause()** function in ***main.py*** is not robust, changing them might cause unexpected errors or crashes. 
-2. **star_update**, **resume_update** and **stop_update** functions in ***applicationUpdate.py*** is not robust, changing them might cause unexpected errors or crashes.
+2. **star_update**, **resume_update** and **stop_update** functions in ***applicationUpdate.py*** are not robust, changing them might cause unexpected errors or crashes.
 3. **START** command is used for reset the selection from mux1 channel1. But in the UI window, you should press **STOP** button before pressing **START** button to function properly, or it just behaves like **RESUME** button. (If **START** still doesn't behave properly after pressing **STOP**, try this process again)
+4. When the program keeps receiving data for a long time (several hours) without stop, there might will be a short stuck when pressing **Stop** button.
 
 ----------------------**Future Plans**----------------------
+- Add code robustness, especially the serial communication part. 
+- Add an input bar in UI, which can enable users to select at which multiplexer and which channel to start, not only mux1 channel1. 
+- Add time robustness. Though some problems don't happen at first, they happen after some time.
