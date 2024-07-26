@@ -31,7 +31,7 @@ For more details on the actual project, you can refer to the Project Scope Docum
 - (Optional) Serial terminal software (e.g. Putty, Tera Term)
 
 ## Installations
-- Connect each multiplexer's control pins to the specified GPIO pins on the Pico as per the `main.py` settings. (e.g. Connect the MCP23017 to the Raspberry Pi Pico via I2C, SDA to Pin2, SCL to Pin3)
+- Connect each multiplexer's control pins to the specified GPIO pins on the Pico as per the `main.py` settings. (e.g. Connect the MCP23017 to the Raspberry Pi Pico via I2C, SDA to GPIO2 (Pin 4), SCL to GPIO3 (Pin 5))
 - The Raspberry Pi Pico 3V3OUT is used for providing power for ADG732 multiplexers as well as the MCP23017, and the external power supply is used for providing power for testing PCBs.
 - **CS** (Chip Selecting) lines use 8 separate lines on the Pico (starting from GPIO8 to GPIO15), while **EN** (Enable) line and **WR** (Write) line are only 1 for each (GPIO20 is the **EN** line, and GPIO21 is the **WR** line). Back to the **CS** line, GPIO8 will be considered as "MUX 1", GPIO9 will be "MUX 2", and onwards to GPIO15 corresponding to MUX 8.
 - Ensure the connection is at the same baud rate. (typically 115200)
