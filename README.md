@@ -13,6 +13,8 @@ This project utilizes two Python scripts, `main.py` and `applicationUpdated.py`.
 
 - `applicationUpdated.py` serves as a GUI-based control and monitoring system for a Raspberry Pi Pico-based data acquisition setup. It allows users to start, pause, and resume data collection, set operational parameters like thresholds and cycle periods, and visualize the acquired data in real-time. Additionally, the application supports exporting collected data to Excel for further analysis.
 
+For more details, you can refer to the Project Scope Document.docx).
+
 ## Prerequisites
 - PC with a USB port
 - Raspberry Pi Pico
