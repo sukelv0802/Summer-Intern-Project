@@ -40,7 +40,7 @@ MCP23017_ADDR = 0x20
 IODIRA = 0x00
 GPIOA = 0x12
 
-# MULTIPLEXER CONFIGURATION
+################ CONFIGURATION FOR PI AND MUXES
 mux_num = 8 # Number of multiplexers (can have a max of 8)
 mux_channels = 32 # Number of channels per multiplexer
 
@@ -51,11 +51,12 @@ channel_period = 0.1
 adc = ADC(Pin(27))  
 
 # Pin configurations
-mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # These are connected to each CS pin on muxes (the 20th pin on the mux)
+mux_en_pins = [Pin(i, Pin.OUT) for i in range(8, 8 + mux_num)] # Starting from GPIO8 to GPIO15, these all go to a CS lin on the MUX
 wr_pin = Pin(20, Pin.OUT)
 en_pin = Pin(21, Pin.OUT)
 gnd_pin = Pin(22, Pin.OUT)
 temp_pin = machine.ADC(4) # Internal temperature sensor
+################
 
 # Configure MCP23017 and set initial pin states
 def setup_mcp23017():
