@@ -13,6 +13,8 @@ This project utilizes two Python scripts, `main.py` and `applicationUpdated.py`.
 
 - `applicationUpdated.py` serves as a GUI-based control and monitoring system for a Raspberry Pi Pico-based data acquisition setup. It allows users to start, pause, and resume data collection, set operational parameters like thresholds and cycle periods, and visualize the acquired data in real-time. Additionally, the application supports exporting collected data to Excel for further analysis.
 
+- Essentially, what we are doing is biasing the ESD protection diode on each pin of an IC, and reading the voltage drop. If the IC is functional, we should get a voltage drop of ~0.6-0.7V, and that should be reflected in the data recorded. In the case of an open, the resistance should theoretically shoot up to infinity, in which case we would read near 0V. If that is ever read, our application will highlight it, indicating that an open has been detected
+
 For more details on the actual project, you can refer to the Project Scope Document.docx.
 
 ## Prerequisites
@@ -30,22 +32,23 @@ For more details on the actual project, you can refer to the Project Scope Docum
 
 ## Installations
 - Connect each multiplexer's control pins to the specified GPIO pins on the Pico as per the `main.py` settings. (e.g. Connect the MCP23017 to the Raspberry Pi Pico via I2C, SDA to Pin2, SCL to Pin3)
-- The Raspberry Pi Pico is used for providing power for ADG732 multiplexers, and the constant voltage source is used for providing power for testing PCBs.
-- **CS** (Chip Selecting) lines use 8 separate lines on the Pico (starting from GPIO8 to GPIO15), while **EN** (Enable) line and **WR** (Write) line are only 1 for each (GPIO20 is the **EN** line, and GPIO21 is the **WR** line).
+- The Raspberry Pi Pico 3V3OUT is used for providing power for ADG732 multiplexers as well as the MCP23017, and the external power supply is used for providing power for testing PCBs.
+- **CS** (Chip Selecting) lines use 8 separate lines on the Pico (starting from GPIO8 to GPIO15), while **EN** (Enable) line and **WR** (Write) line are only 1 for each (GPIO20 is the **EN** line, and GPIO21 is the **WR** line). Back to the **CS** line, GPIO8 will be considered as "MUX 1", GPIO9 will be "MUX 2", and onwards to GPIO15 corresponding to MUX 8.
 - Ensure the connection is at the same baud rate. (typically 115200)
 - Ensure the Raspberry Pi Pico is connected via USB and that the correct COM port is selected in the application.
 - For the MCP23017, connect its GPA0 to GPA4 lines to the selection pins on every MUX (A0-A4 on the ADG732). 
-- On the ADG732, ground pin 23, **DO NOT GROUND PIN 24 (The Vss Pin)**
+- On the ADG732, ground pin 23, **DO NOT GROUND PIN 24 ON THE ADG732 (The Vss Pin)**
+- Every drain (output) pin on the ADG732 should go into ADC1 pin on the Pico (the same as Pin 32). There should also be a resistor going to ground as well for that ADC pin. The resistor value will need to be callibrated based on the voltage being supplied to each ESD diode. Note that the ADC's on the Pico have a limit of 3.3V.
 
 ## How to Run
 1. First flash the MicroPython firmware onto the Pico. Press the BOOTSEL button and hold it while you connect the other end of the microUSB cable, and you should see a drive pop up on your computer. Download MicroPython from their official website (https://micropython.org/), and move the file to the drive. The device should disappear and reset, indicating that you did it correctly, in which case you should be able to unplug and plug it back in. This youtube link is helpful to setting up the Pico as well as part of the next step in installing the Micropico extension (https://www.youtube.com/watch?v=O6lkYTfcMEg)
 2. Next setup a Python environment on Visual Studio Code, as well as the Micropico extension.
 3. To put the main.py file onto the Pico, first open a terminal instance of Pico vREPL, and click "Pico Disconnected" to toggle the board connection (it should say Pico Connected after you click it). Next, press Ctrl+Shift+P, and first select the "Delete all files from board." After that, repeat, but this time select "Upload current file to Pico" while on `main.py`. To confirm if done successfuly, you can open a terminal instance of Pico vREPL, and run the following commands:
->>> import os
->>> os.listdir()
+`import os`
+`os.listdir()`
 You should be able to see main.py.
 4. Next disconnect the Pico, unplug and plug the microUSB again. We do this to open up the COM port to allow for serial communication. To find which COM port the Pico is connected to on the computer, Micropico has a way to do it (Select "List serial ports" after you do Ctrl+Shift+P) In another terminal, run "py applicationUpdated.py" to open up the GUI. Before running, select the right COM port that Micropico mentioned. You can also set a threshold voltage, anything recorded below that threshold will be highlighted yellow. The cycle period refers how long you want one cycle to be (a cycle includes the time to switch through all 256 channels, as well as the time for the mux to rest). The select mux/channels right now are only there for the plot tab.
-5. Now to begin running the application, first click "Stop." This is because whenever the Pico is initially plugged into the computer, it will always just continuously run the main.py file, meaning by the time you click "Start," you could already be halfway through a cycle. After you hit "Stop," you can click the "Timestamp" header on the top to sort the table better, and then hit "Start." It is worth noting that when you first plug the Pico in and open the application, we have found that this sometimes doesn't work, in which case you need to repeat the "Stop" into "Start" process. From here on out, the application will simply record all the data that it is being received. If you ever wish to stop the program, you can click the "Stop" button, but from that point, you should hit "Resume" if you want to continue from where you paused. The "Start" button should only be clicked if you ever want to reset back to the beginning (Mux 1, Channel 1).
+5. Now to begin running the application, first click "Stop." This is because whenever the Pico is initially plugged into the computer, it will always just continuously run the main.py file, meaning by the time you click "Start," you could already be halfway through a cycle. After you hit "Stop," you can click the "Timestamp" header on the top to sort the table better, and then hit "Start." It is worth noting that when you first plug the Pico in and open the application, we have found that this sometimes doesn't work, in which case you need to repeat the "Stop" into "Start" process. From here on out, the application will simply record all the data that it is being received. If you ever wish to stop the program, you can click the "Stop" button, but from that point, you should hit "Resume" if you want to continue from where you paused. The "Start" button should only be clicked if you ever want to reset back to the beginning (Mux 1, Channel 1). More details on the controls can be found in the "Operational Controls" section below.
 
 ## Additional Notes
 - Modify the script parameters such as `channel_period` in `main.py` based on the specific timing and performance requirements of your sensors and multiplexers. The unit of `channel_period` is *s*. (e.g. `channel_period` = 0.1 means a frequency of 10Hz)
